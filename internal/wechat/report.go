@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -59,6 +60,60 @@ func (r *Report) ShouldSkip(group string) (Result, bool) {
 		return res, true
 	}
 	return res, false
+}
+
+// FindBySignature 在已有记录中按缩略图签名距离查找最接近的一条，
+// 用于屏幕模式下跨运行去重（无法读取群名）。
+func (r *Report) FindBySignature(sig string, maxDistance int) (Result, bool) {
+	if sig == "" {
+		return Result{}, false
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	bestDist := maxDistance + 1
+	var best Result
+	for _, res := range r.State.Groups {
+		if res.Signature == "" {
+			continue
+		}
+		d, ok := signatureDistance(sig, res.Signature)
+		if !ok || d > maxDistance {
+			continue
+		}
+		if d < bestDist {
+			bestDist = d
+			best = res
+		}
+	}
+	if bestDist <= maxDistance {
+		return best, true
+	}
+	return Result{}, false
+}
+
+func signatureDistance(a, b string) (int, bool) {
+	if len(a) != len(b) || len(a) < 2 {
+		return 0, false
+	}
+	sum, n := 0, 0
+	for i := 0; i+1 < len(a); i += 2 {
+		av, err1 := strconv.ParseUint(a[i:i+2], 16, 8)
+		bv, err2 := strconv.ParseUint(b[i:i+2], 16, 8)
+		if err1 != nil || err2 != nil {
+			return 0, false
+		}
+		d := int(av) - int(bv)
+		if d < 0 {
+			d = -d
+		}
+		sum += d
+		n++
+	}
+	if n == 0 {
+		return 0, false
+	}
+	return sum / n, true
 }
 
 func (r *Report) MarkAlready(group, reason string) error {

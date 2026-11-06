@@ -34,7 +34,16 @@ var (
 	procGetWindowTextW      = user32.NewProc("GetWindowTextW")
 	procGetWindowTextLength = user32.NewProc("GetWindowTextLengthW")
 	procSetProcessDPIAware  = user32.NewProc("SetProcessDPIAware")
+	procGetDpiForWindow     = user32.NewProc("GetDpiForWindow")
 )
+
+// DPI 返回窗口所在显示器的 DPI（96 为 100% 缩放）。
+func DPI(hwnd win.HWND) int {
+	if dpi, _, _ := procGetDpiForWindow.Call(uintptr(hwnd)); dpi != 0 {
+		return int(dpi)
+	}
+	return 96
+}
 
 type Window struct {
 	HWND    win.HWND
@@ -130,6 +139,21 @@ func Foreground(hwnd win.HWND) {
 		time.Sleep(150 * time.Millisecond)
 	}
 	time.Sleep(200 * time.Millisecond)
+}
+
+// Show 显示窗口。
+func Show(hwnd win.HWND) {
+	win.ShowWindow(hwnd, win.SW_SHOW)
+}
+
+// Maximize 最大化窗口。
+func Maximize(hwnd win.HWND) {
+	win.ShowWindow(hwnd, win.SW_MAXIMIZE)
+}
+
+// SetRect 移动并调整窗口大小。
+func SetRect(hwnd win.HWND, r image.Rectangle) {
+	win.SetWindowPos(hwnd, 0, int32(r.Min.X), int32(r.Min.Y), int32(r.Dx()), int32(r.Dy()), win.SWP_NOZORDER|win.SWP_NOACTIVATE)
 }
 
 func ClassName(hwnd win.HWND) string {

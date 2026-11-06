@@ -36,18 +36,30 @@ type Message struct {
 }
 
 type Card struct {
-	Index int
-	Name  string
-	Group string
-	Rect  image.Rectangle
+	Index       int
+	Name        string
+	Group       string
+	Rect        image.Rectangle
+	Fingerprint string
+}
+
+// Runner 抽象了两种执行方式：UIA 模式（微信 4.1.x）和屏幕模式（微信 4.2+）。
+type Runner interface {
+	CollectCards() ([]Card, error)
+	ProcessCard(Card) Result
+	ShouldSkip(Card) (Result, bool)
+	AddResult(Result) error
+	WriteSummary() error
+	Close()
 }
 
 type Result struct {
-	Group  string    `json:"group"`
-	Status string    `json:"status"`
-	Reason string    `json:"reason"`
-	Card   string    `json:"card"`
-	At     time.Time `json:"at"`
+	Group     string    `json:"group"`
+	Status    string    `json:"status"`
+	Reason    string    `json:"reason"`
+	Card      string    `json:"card"`
+	Signature string    `json:"signature,omitempty"`
+	At        time.Time `json:"at"`
 }
 
 func New(chat, sinceText, debugDir string, logger *log.Logger) (*App, error) {
@@ -88,6 +100,12 @@ func (a *App) Close() {
 		a.MainElem.Release()
 	}
 }
+
+func (a *App) ShouldSkip(c Card) (Result, bool) { return a.Report.ShouldSkip(c.Group) }
+
+func (a *App) AddResult(res Result) error { return a.Report.Add(res) }
+
+func (a *App) WriteSummary() error { return a.Report.WriteSummary() }
 
 func findMainWindow(auto *uia.Automation) (win.HWND, error) {
 	var candidates []win32.Window
